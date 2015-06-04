@@ -1,0 +1,13 @@
+heartCtrl_T+T-.pro work fine.(at 15/06/04)
+DAQCtrl.dll is NI DAQ controler, work fine also. ( There was a 4KB version in our lab before I use it. That 4KB version don't work !! )
+Timer.dll is a high resolution timer . It's need give 2 variable space(size == long64) count and freq , after return , time(sec) = count / freq .
+
+DAQCtrl.dll and Timer.dll written by CKC.
+
+====== The history of IDL program ======
+
+The origianl name of heartCtrl_T+T-.pro was t1t2_new_1.pro.
+and it's base on dt_06_1.pro,
+dt_06_1.pro is base on new_dt_06.pro
+dt* is by mimi, new is by brian.
+
