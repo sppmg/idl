@@ -1,6 +1,12 @@
+; for proportional control
 pro timer, count, freq
 	DLL = "C:\data\brian\prog\idl\Timer.dll"
 	Timer = call_external(DLL, "Timer", count, freq, /i_value)
+end
+pro add_slider,name,max_val,min_val,init_val,text
+	base = WIDGET_BASE()
+	name = widget_sLIDER(base,title=text,maximum=max_val,minimum=min_val,value=init_val)
+	Widget_Control, /REALIZE, base
 end
 
 function t,ti
@@ -11,6 +17,8 @@ function t,ti
 	return,(timer_count - ti)*1.0/timer_freq
 	;return , double(systime(1))-double(ti)
 end
+
+
 
 FUNCTION DAQCtrl, AODevID, AIDevID, OP, Output, Input
 	AODevID = byte(AODevID)
@@ -28,7 +36,7 @@ FUNCTION DAQCtrl, AODevID, AIDevID, OP, Output, Input
 	RETURN, Input
 END
 
-;function pacing,t0,dt,count,len
+;function pacing,t0,gain,count,len
 ;			AODevID = "Dev1/ao0:0"
 ;			AIDevID = "Dev1/ai0:1"
 ;			Output = dblarr(1)
@@ -39,6 +47,9 @@ END
 ;
 ;	return ,t_start
 ;end
+
+;add_slider,ui_t0,65,20,40,'t0/10'
+;add_slider,ui_gain,40,0,0,'gain*10'
 
 ;=========== program setting =========
 ;;;;; setup DAQ;;;;;;
@@ -52,42 +63,34 @@ OP = fix(2) ;Start Task
 
 DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
 ;============= user setting ==========
-;count_total=fix(total([143,158,176,200,231,273]) ) ; include last number
-;t0_start=0.42
-;t0_end=0.22
-;t0=dindgen(count_total)*((t0_end-t0_start)/double(count_total-1))+t0_start
-;double([0.42,0.38,0.34,0.3,0.26,0.22])
-;dt=MAKE_ARRAY(count_total, /double, VALUE = 3)
-;double([])
-;count=MAKE_ARRAY(count_total, /double, VALUE = 1)
-;count=fix([143,158,176,200,231,273])	;count of pacing,lose first pacing
+;t0=double([0.30,0.25,0.23,   0.23,   0.23])
+;gain=double([0,0,0,   5,  0])
+;count=fix([50,50,154,    260,   782])	;count of pacing,lose first pacing
 
-
-
-t0=double([0.42,0.38,0.34,0.3,0.26,0.22,0.20,.18])
-dt=dblarr(size(t0, /N_ELEMENTS))+2.
+;t0=double([0.42,0.38,0.34,0.3,0.26,0.22,0.20,.18])
+t0=double([0.26,0.22,0.20,.18])
+gain=dblarr(size(t0, /N_ELEMENTS))+ 0.50
 count=round(60/t0)
-	;count of pacing,lose first pacing
 
 start_time=10.
 debug=0
 ;=====================================
 ;if ((findfile(config))[0] ne "") then @config
-;a=3&b=6&c=10&print,dindgen(c+1)*((b-a)/double(c))+a
-len_t0=(size(t0))[1]
-len_dt=(size(dt))[1]
-len_count=(size(count))[1]
-if ( len_t0 eq len_dt ) || ( len_dt eq len_count ) then begin
-	len=len_t0
-endif else begin
-	print,"error:difference length t0,dt,count"
-	retall
-endelse
 
-dt_old=0.
+;len_t0=(size(t0))[1]
+;len_gain=(size(gain))[1]
+;len_count=(size(count))[1]
+;if ( len_t0 eq len_gain ) || ( len_gain eq len_count ) then begin
+;	len=len_t0
+;endif else begin
+;	print,"error:difference length t0,gain,count"
+;	retall
+;endelse
+
+gain_old=0.
 t0_old=0.
 ;================
-print,"total ",total(count*t0)," mins"
+;print,"total ",total(count*t0)," mins"
 
 ;================
 
@@ -100,16 +103,19 @@ timer, timer_count, timer_freq
 t_start = timer_count
 
 
-i=0			;part of exp == index of dt
+i=0			;part of exp == index of gain
 pacingtime=0d
 peak=dblarr(2)
+;while 1 do begin
+len= size(gain, /N_ELEMENTS)
 while i lt len do begin
+	wait,1e-3
 
+	dp =0    ; pressure differ
 	for j=1,count(i) do begin
-
-	;----- start t1t2 -----
+	;----- start control pacing -----
 	sign=1d
-	if dt(i) ne 0. then begin
+	if gain(i) ne 0. then begin
 
 		pre = dblarr(100000)
 		k=0L
@@ -118,7 +124,7 @@ while i lt len do begin
 		timer, timer_count, timer_freq
 		t_read_start = timer_count
 
-		cond = (t0(i)-dt(i)*1e-3 )*0.8		; old condition was "t0(i)*0.9"
+		cond = (t0(i)-gain(i)*1e-3 )*0.8		; old condition was "t0(i)*0.9"
 		while t(t_read_start) lt cond do begin
 			DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
 			pre[k] = Input[0]
@@ -127,49 +133,35 @@ while i lt len do begin
 			++k
 		endwhile
 		peak[1] = max(smooth(pre[0:k-1],10))
-
-		if debug eq 1 then begin
-			peak[0]=1.
-			peak[1]=0.
-		endif
-		case 1 of
-			;(abs(peak[1]-peak[0]) lt 0.0005):sign=0d
-			(peak[1] gt peak[0]):sign=1d
-			(peak[1] lt peak[0]):sign=-1d
-			else :sign=0
-		endcase
-		if sign eq 0 then begin
-			print,"dt=0"
-		endif
-		;print,"peak[0]=",peak[0]," / peak[1]=",peak[1],sign
+		dp=(peak[1]-peak[0])
 		peak[0]=peak[1]
 
 	endif
 
-		;----- next pacing time ------
-		pacingtime=pacingtime+t0(i)+sign*abs(dt(i)*0.001)
+	;----- next pacing time ------
+	pacingtime=pacingtime+t0(i)+ gain(i)*dp
 
-		while t(t_start) lt pacingtime  do begin	; wait to pacing time
-			;print,(pacingtime-t(t_start))
-			diff_time=pacingtime-t(t_start)
-			;if diff_time gt 0.1 then wait,diff_time*0.5
-		endwhile
-		if debug ne 1 then begin	; pace
-			Output[0] = 10
-			DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
-			;wait, 0.001 ; <-from mi
-			Output[0] = 0
-			DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
-		endif
+	while t(t_start) lt pacingtime  do begin	; wait to pacing time
+		;print,(pacingtime-t(t_start))
+		diff_time=pacingtime-t(t_start)
+		;if diff_time gt 0.1 then wait,diff_time*0.5
+	endwhile
+	if debug ne 1 then begin	; pace
+		Output[0] = 10
+		DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
+		wait, 0.001 ; <-from mi
+		Output[0] = 0
+		DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
+	endif
 
-		;print,"out ",t(t_start),"/",diff_time,"/",t0(i),"/",sign*abs(dt(i)*0.001),"/",t0(i)+sign*abs(dt(i)*0.001)
-		if dt(i) ne dt_old or t0(i) ne t0_old then begin
-			dt_old=dt(i)
-			t0_old=t0(i)
-			print ,"t0=",t0(i)," ms / ","dt=",dt(i)," ms in ",t(t_start),"/",t(t_start)+start_time
-		endif
-		;print,"out ",t0(i),"/",sign*abs(dt(i)*0.001),"/",t0(i)+sign*abs(dt(i)*0.001)
-		;output
+	;print,"out ",t(t_start),"/",diff_time,"/",t0(i),"/",sign*abs(gain(i)*0.001),"/",t0(i)+sign*abs(gain(i)*0.001)
+	if gain(i) ne gain_old or t0(i) ne t0_old then begin
+		gain_old=gain(i)
+		t0_old=t0(i)
+		print ,"t0=",t0(i)," ms / ","gain=",gain(i)," ms in ",t(t_start),"/",t(t_start)+start_time
+	endif
+	;print,"out ",t0(i),"/",sign*abs(gain(i)*0.001),"/",t0(i)+sign*abs(gain(i)*0.001)
+	;output
 	endfor
 	++i
 endwhile
