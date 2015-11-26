@@ -11,3 +11,9 @@ and it's base on dt_06_1.pro,
 dt_06_1.pro is base on new_dt_06.pro
 dt* is by mimi, new is by brian.
 
+========================================
+The serious bug in commit 7516202ee47aacd2fb7398f200ee46c76577f67f (2015-06-22)
+was for performance code, so only in this session experiment should be check.
+The 2015-11-26's code fixed and it's did not change long time.
+
+I rename again in 2015-11-26 .

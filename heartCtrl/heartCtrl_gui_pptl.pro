@@ -1,12 +1,8 @@
+; for GUI proportional control
 pro timer, count, freq
 	DLL = "C:\data\brian\prog\idl\Timer.dll"
 	Timer = call_external(DLL, "Timer", count, freq, /i_value)
 end
-; pro add_slider,name,max_val,min_val,init_val,text
-; 	base = WIDGET_BASE()
-; 	name = widget_sLIDER(base,title=text,maximum=max_val,minimum=min_val,value=init_val)
-; 	Widget_Control, /REALIZE, base
-; end
 
 function t,ti
 	timer_count = long64(0)
@@ -47,10 +43,10 @@ END
 ;	return ,t_start
 ;end
 
-; add_slider,ui_t0,65,15,40,'t0/10'
-; add_slider,ui_dt,100,0,0,'dt*10'
+; add_slider,ui_t0,65,20,40,'t0/10'
+; add_slider,ui_dt,50,0,0,'gain*10'
 ; add_slider,ui_eps_gain,20,0,0,'eps gain'
-; add_slider,ui_sw_rand,1,0,0,'sw rand'
+
 
 ;=========== program setting =========
 ;;;;; setup DAQ;;;;;;
@@ -69,16 +65,14 @@ DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
 ;count=fix([50,50,154,    260,   782])	;count of pacing,lose first pacing
 start_time=10.
 debug=0
+eps_base=1e-4
 ;============= GUI setting ===========
 gui_base=widget_base(column=1)
-gui_sld_t0=widget_slider(gui_base, title="t0/10", minimum=15, maximum=65, value=40)
-gui_sld_dt=widget_slider(gui_base, title="dt*10", minimum=0, maximum=200, value=0)
-gui_sld_eps=widget_slider(gui_base, title="eps", minimum=0, maximum=50, value=0)
-gui_sld_rand=widget_slider(gui_base, title="SW(rand)", minimum=0, maximum=1, value=0)
-
+gui_sld_t0=widget_slider(gui_base, title="t0(s) x 100", minimum=15, maximum=65, value=40)
+gui_sld_gain=widget_slider(gui_base, title="gain x 1e-4", minimum=0, maximum=500, value=0)
+gui_sld_eps=widget_slider(gui_base, title="eps x 1e-4", minimum=0, maximum=500, value=0)
 widget_control, gui_base, /realize		; display on screen
 ;=====================================
-
 ;if ((findfile(config))[0] ne "") then @config
 
 ;len_t0=(size(t0))[1]
@@ -91,7 +85,7 @@ widget_control, gui_base, /realize		; display on screen
 ;	retall
 ;endelse
 
-dt_old=0.
+gain_old=0.
 t0_old=0.
 ;================
 ;print,"total ",total(count*t0)," mins"
@@ -107,36 +101,33 @@ timer, timer_count, timer_freq
 t_start = timer_count
 
 
-i=0			;part of exp == index of dt
+i=0			;part of exp == index of gain
+
 pacingtime=0d
 peak=dblarr(2)
-eps_base=1e-3
-eps_gain=0.
-seed=1234L
-sl=10
-k=0
 while 1 do begin
 	wait,1e-3
+	dp = 0
+	
 	widget_control, gui_sld_t0, get_value=t0
 	t0=t0*1e-2
-	widget_control, gui_sld_dt, get_value=dt
-	dt=dt/10.
+	widget_control, gui_sld_gain, get_value=gain
+	gain=gain*1e-4
 	widget_control, gui_sld_eps, get_value=eps_gain
 	eps=eps_base*eps_gain
-	widget_control, gui_sld_rand, get_value=sw_rand
-
+	
 	;----- start t1t2 -----
 	sign=1d
-	if dt ne 0. then begin
+	if gain ne 0. then begin
 
-		pre = dblarr(100000)
+		pre = dblarr(1e5)
 		k=0L
 
 		;------------ get peak -----------
 		timer, timer_count, timer_freq
 		t_read_start = timer_count
 
-		cond = (t0-dt*1e-3 )*0.8		; old condition was "t0(i)*0.9"
+		cond = t0*0.8		; old condition was "t0(i)*0.9"
 		while t(t_read_start) lt cond do begin
 			DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
 			pre[k] = Input[0]
@@ -144,33 +135,18 @@ while 1 do begin
 			wait, 0.0009
 			++k
 		endwhile
-		if sw_rand then begin
-			peak[1] = randomu(seed,1)
-		endif else begin
-			sl=ceil(k/cond*0.01)
-			peak[1] = max(smooth(pre[0:k-1],sl))
-		endelse
-
-		if debug eq 1 then begin
-			peak[0]=1.
-			peak[1]=0.
-		endif
-		case 1 of
-			;(abs(peak[1]-peak[0]) lt 0.0005):sign=0d
-			(peak[1] gt peak[0] +eps):sign=1d
-			(peak[1] lt peak[0] -eps):sign=-1d
-			else :sign=0
-		endcase
-		if sign eq 0 then begin
-			print,"dt=0"
-		endif
-		;print,"peak[0]=",peak[0]," / peak[1]=",peak[1],sign
+		sl=ceil(k/cond*0.01)
+		peak[1] = max(smooth(pre[0:k-1], sl))
+		dp=(peak[1]-peak[0])
 		peak[0]=peak[1]
 
 	endif
+	if  abs(dp) lt eps then dp=0
+
+
 
 	;----- next pacing time ------
-	pacingtime=pacingtime+t0(i)+sign*abs(dt(i)*0.001)
+	pacingtime=pacingtime+t0(i)+ dp*gain
 
 	while t(t_start) lt pacingtime  do begin	; wait to pacing time
 		;print,(pacingtime-t(t_start))
@@ -185,14 +161,13 @@ while 1 do begin
 		DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
 	endif
 
-	;print,"out ",t(t_start),"/",diff_time,"/",t0(i),"/",sign*abs(dt(i)*0.001),"/",t0(i)+sign*abs(dt(i)*0.001)
-	if dt ne dt_old or t0 ne t0_old then begin
-		dt_old=dt
+	;print,"out ",t(t_start),"/",diff_time,"/",t0(i),"/",sign*abs(gain(i)*0.001),"/",t0(i)+sign*abs(gain(i)*0.001)
+	if gain ne gain_old or t0 ne t0_old then begin
+		gain_old=gain
 		t0_old=t0
-		print ,"t0=",t0," ms / ","dt=",dt," ms in ",t(t_start),"/",t(t_start)+start_time
-		print ,"k=",k,"    sl=",sl
+		print ,"t0=",t0," ms / ","gain=",gain," ms in ",t(t_start),"/",t(t_start)+start_time
 	endif
-	;print,"out ",t0(i),"/",sign*abs(dt(i)*0.001),"/",t0(i)+sign*abs(dt(i)*0.001)
+	;print,"out ",t0(i),"/",sign*abs(gain(i)*0.001),"/",t0(i)+sign*abs(gain(i)*0.001)
 	;output
 
 endwhile

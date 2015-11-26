@@ -18,8 +18,6 @@ function t,ti
 	;return , double(systime(1))-double(ti)
 end
 
-
-
 FUNCTION DAQCtrl, AODevID, AIDevID, OP, Output, Input
 	AODevID = byte(AODevID)
 	AODevID = long(AODevID)
@@ -68,8 +66,10 @@ DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
 ;count=fix([50,50,154,    260,   782])	;count of pacing,lose first pacing
 
 ;t0=double([0.42,0.38,0.34,0.3,0.26,0.22,0.20,.18])
+
+; note :gain(i)*1e-4 , eg. 280
 t0=double([0.26,0.22,0.20,.18])
-gain=dblarr(size(t0, /N_ELEMENTS))+ 0.50
+gain=dblarr(size(t0, /N_ELEMENTS))+ 280
 count=round(60/t0)
 
 start_time=10.
@@ -117,14 +117,14 @@ while i lt len do begin
 	sign=1d
 	if gain(i) ne 0. then begin
 
-		pre = dblarr(100000)
+		pre = dblarr(1e5)
 		k=0L
 
 		;------------ get peak -----------
 		timer, timer_count, timer_freq
 		t_read_start = timer_count
 
-		cond = (t0(i)-gain(i)*1e-3 )*0.8		; old condition was "t0(i)*0.9"
+		cond = t0(i)*0.8		; old condition was "t0(i)*0.9"
 		while t(t_read_start) lt cond do begin
 			DAQ2IDL = DAQCtrl(AODevID, AIDevID, OP, Output, Input)
 			pre[k] = Input[0]
@@ -132,7 +132,8 @@ while i lt len do begin
 			wait, 0.0009
 			++k
 		endwhile
-		peak[1] = max(smooth(pre[0:k-1],10))
+		sl=ceil(k/cond*0.01)
+		peak[1] = max(smooth(pre[0:k-1],sl))
 		dp=(peak[1]-peak[0])
 		peak[0]=peak[1]
 
