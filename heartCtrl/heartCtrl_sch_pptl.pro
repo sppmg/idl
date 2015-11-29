@@ -106,6 +106,7 @@ t_start = timer_count
 i=0			;part of exp == index of gain
 pacingtime=0d
 peak=dblarr(2)
+pre = dblarr(5e5)
 ;while 1 do begin
 len= size(gain, /N_ELEMENTS)
 while i lt len do begin
@@ -116,10 +117,7 @@ while i lt len do begin
 	;----- start control pacing -----
 	sign=1d
 	if gain(i) ne 0. then begin
-
-		pre = dblarr(1e5)
 		k=0L
-
 		;------------ get peak -----------
 		timer, timer_count, timer_freq
 		t_read_start = timer_count

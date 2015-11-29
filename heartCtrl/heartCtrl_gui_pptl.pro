@@ -104,6 +104,7 @@ t_start = timer_count
 i=0			;part of exp == index of gain
 
 pacingtime=0d
+pre = dblarr(5e5)
 peak=dblarr(2)
 while 1 do begin
 	wait,1e-3
@@ -119,10 +120,7 @@ while 1 do begin
 	;----- start t1t2 -----
 	sign=1d
 	if gain ne 0. then begin
-
-		pre = dblarr(1e5)
 		k=0L
-
 		;------------ get peak -----------
 		timer, timer_count, timer_freq
 		t_read_start = timer_count

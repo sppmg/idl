@@ -103,6 +103,7 @@ t_start = timer_count
 i=0			;part of exp == index of dt
 pacingtime=0d
 peak=dblarr(2)
+pre = dblarr(5e5)
 while i lt len do begin
 
 	for j=1,count(i) do begin
@@ -110,10 +111,7 @@ while i lt len do begin
 	;----- start t1t2 -----
 	sign=1d
 	if dt(i) ne 0. then begin
-
-		pre = dblarr(100000)
 		k=0L
-
 		;------------ get peak -----------
 		timer, timer_count, timer_freq
 		t_read_start = timer_count

@@ -116,6 +116,7 @@ eps_gain=0.
 seed=1234L
 sl=10
 k=0
+pre = dblarr(5e5)
 while 1 do begin
 	wait,1e-3
 	widget_control, gui_sld_t0, get_value=t0
@@ -129,10 +130,7 @@ while 1 do begin
 	;----- start t1t2 -----
 	sign=1d
 	if dt ne 0. then begin
-
-		pre = dblarr(1e5)
 		k=0L
-
 		;------------ get peak -----------
 		timer, timer_count, timer_freq
 		t_read_start = timer_count
