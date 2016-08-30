@@ -76,7 +76,7 @@ gui_sld_t0=widget_slider(gui_base, title="t0(s) x 100", minimum=15, maximum=65, 
 gui_sld_dt=widget_slider(gui_base, title="dt(ms) x 10", minimum=0, maximum=200, value=0)
 gui_sld_eps=widget_slider(gui_base, title="eps x 1e-4", minimum=0, maximum=500, value=0)
 gui_sld_rand=widget_slider(gui_base, title="SW(rand)", minimum=0, maximum=1, value=0)
-
+gui_sld_rvsRule=widget_slider(gui_base, title="SW(reverse rule)", minimum=0, maximum=1, value=0)
 widget_control, gui_base, /realize		; display on screen
 ;=====================================
 
@@ -126,6 +126,7 @@ while 1 do begin
 	widget_control, gui_sld_eps, get_value=eps_gain
 	eps=eps_base*eps_gain
 	widget_control, gui_sld_rand, get_value=sw_rand
+	widget_control, gui_sld_rand, get_value=sw_rvsRule
 
 	;----- start t1t2 -----
 	sign=1d
@@ -160,6 +161,8 @@ while 1 do begin
 			(peak[1] lt peak[0] -eps):sign=-1d
 			else :sign=0
 		endcase
+		if sw_rvsRule then sign= -sign 
+		
 		if sign eq 0 then begin
 			print,"dt=0"
 		endif

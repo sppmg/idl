@@ -68,7 +68,8 @@ t0=double([0.42,0.38,0.34,0.3,0.26,0.22,0.20,.18])
 dt=dblarr(size(t0, /N_ELEMENTS))+2.
 count=round(60/t0)
 	;count of pacing,lose first pacing
-
+sw_rule=0 ; 0 = normal t+t-, 1 = reverse rule
+	
 start_time=10.
 debug=0
 ;=====================================
@@ -130,12 +131,15 @@ while i lt len do begin
 			peak[0]=1.
 			peak[1]=0.
 		endif
+		
 		case 1 of
 			;(abs(peak[1]-peak[0]) lt 0.0005):sign=0d
 			(peak[1] gt peak[0]):sign=1d
 			(peak[1] lt peak[0]):sign=-1d
 			else :sign=0
 		endcase
+		if sw_rvsRule then sign= -sign 
+		
 		if sign eq 0 then begin
 			print,"dt=0"
 		endif
